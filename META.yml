@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name: Net-SDP
-version: 0.01
+version: 0.02
 author:
   - Nicholas Humfrey, njh@ecs.soton.ac.uk
 abstract: Session Description Protocol (rfc2327)
@@ -16,11 +16,11 @@ build_requires:
 provides:
   Net::SDP:
     file: lib/Net/SDP.pm
-    version: 0.01
+    version: 0.02
   Net::SDP::Media:
     file: lib/Net/SDP/Media.pm
-    version: 0.01
+    version: 0.02
   Net::SDP::Time:
     file: lib/Net/SDP/Time.pm
-    version: 0.01
-generated_by: Module::Build version 0.25
+    version: 0.02
+generated_by: Module::Build version 0.26

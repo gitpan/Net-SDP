@@ -6,9 +6,12 @@ examples/parse_and_generate.pl
 examples/simple_generate.pl
 examples/sdpinfo.pl
 examples/kwax.sdp
+examples/surge-test.sdp
 Changes
 MANIFEST
 README
 Build.PL
-t/use.t
+t/00use.t
+t/10generate.t
+t/10parse.t
 META.yml

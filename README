@@ -1,4 +1,4 @@
-Net-SDP version 0.01
+Net-SDP version 0.02
 ====================
 
 Net::SDP is a parser and generator for
@@ -17,6 +17,9 @@ INSTALLATION
 		perl Build.PL
 		./Build
 		./Build test
+
+	And then as root:
+	
 		./Build install
 
 	Module::Build is available in the Debian package:

@@ -13,7 +13,7 @@ package Net::SDP::Media;
 use strict;
 use vars qw/$VERSION %static_pt_map/;
 use Carp;
-$VERSION="0.01";
+$VERSION="0.02";
 
 
 
@@ -64,19 +64,18 @@ $VERSION="0.01";
 
 
 
-sub _new {
+sub new {
 	my $class = shift;
-	my $session = shift;
 	my $self = {
 		'm_media' => 'unknown',
 		'm_port' => 0,
 		'm_transport' => 'RTP/AVP',
 		'm_fmt_list' => [],
+		'i' => undef,
 		'c_net_type' => 'IN',
 		'c_addr_type' => 'IP4',
 		'c_address' => '0.0.0.0',
 		'c_ttl' => 5,
-		'session' => $session,
 		'a' => {}
 	};
 	bless $self, $class;	
@@ -110,7 +109,7 @@ sub _parse_m {
 	$self->{'m_fmt_list'} = \@formats;
 	
 	($self->{'m_port'}, my $range) = split(/\//, $port);
-	if ($range ne '' and $range ne '1') {
+	if (defined $range and $range ne '' and $range ne '1') {
 		carp "Port ranges are not supported by Net::SDP.";
 	}
 	
@@ -142,7 +141,7 @@ sub _parse_c {
 		carp "Address type is not IP4 or IP6: ".$self->{'c_addr_type'};
 	}
 	
-	if ($range ne '' and $range ne '1') {
+	if (defined $range and $range ne '' and $range ne '1') {
 		carp "Address ranges are not supported by Net::SDP.";
 	}
 	
@@ -197,6 +196,13 @@ sub media_type {
 	my ($media) = @_;
     $self->{'m_media'} = $media if defined $media;
     return $self->{'m_media'};
+}
+
+sub title {
+    my $self=shift;
+	my ($title) = @_;
+    $self->{'i'} = $title if defined $title;
+    return $self->{'i'};
 }
 
 sub transport {
@@ -383,6 +389,15 @@ New media descriptions can be created using the C<new_media_desc()> method in C<
 
 =over 4
 
+
+=item B<title()>
+
+Get or Set the title for this media description. B<[i=]>
+
+Example:
+
+	$audio = $audio->title();
+	$audio->title( 'English' );
 
 =item B<address()>
 

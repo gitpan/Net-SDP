@@ -22,12 +22,14 @@ use Sys::Hostname;
 use Net::hostent;
 use Carp;
 
-$VERSION="0.01";
+$VERSION="0.02";
 
 
 
 sub new {
     my $class = shift;
+    my ($data) = @_;
+    
     my $self = {'v'=>'0',
     			'session'=> {
      				'o_uname' => $ENV{'USER'} || '-',
@@ -43,8 +45,14 @@ sub new {
    				'media'=>[],
    				'time'=>[]
    	};
-
     bless $self, $class;
+   	
+   	
+   	# Parse data if we are passed some
+   	if (defined $data) {
+   		$self->parse( $data );
+   	}
+
     return $self;
 }
 
@@ -55,7 +63,14 @@ sub parse {
 
 	if (@_ == 1) {
 
-    	if ($source =~ /^v=0/) {
+		if (ref $source eq 'Net::SAP::Packet') {
+			# It is a SAP packet
+			if ($source->payload_type() ne 'application/sdp') {
+				croak "Payload type of Net::SAP::Packet is not application/sdp.";
+			}
+			return $self->parse_data( $source->payload() );
+
+    	} elsif ($source =~ /^v=0/) {
     		# Looks like start of SDP file
     		return $self->parse_data( $source );
     		
@@ -162,7 +177,7 @@ sub parse_data {
 				
 			} elsif ($field eq 't') {
 			
-				my $time = Net::SDP::Time->_new( $self, $value );
+				my $time = new Net::SDP::Time( $value );
 				
 				push( @{$self->{'time'}}, $time );
 
@@ -198,7 +213,7 @@ sub parse_data {
 		if ($section eq 'media') {
 		
 			if ($field eq 'm') {
-				my $media = Net::SDP::Media->_new( $self, $value );
+				my $media = new Net::SDP::Media( $value );
 				
 				# Copy accross connection information for easier access
 				if (defined $self->{'session'}->{'c'}) {
@@ -263,7 +278,7 @@ sub _validate_self {
 		carp "Invalid SDP file: Session is missing required time discription";
 		
 		# Make it valid :-/
-		$self->{'time'}->[0] = Net::SDP::Time->_new( $self );
+		$self->{'time'}->[0] = new Net::SDP::Time();
 	}
 	
 	# Everything is ok :)
@@ -452,28 +467,28 @@ sub session_origin_id {
 sub session_origin_version {
 	my $self=shift;
 	my ($vers) = @_;
-    $self->{'o_sess_vers'} = $vers if defined $vers;
+    $self->{'session'}->{'o_sess_vers'} = $vers if defined $vers;
 	return $self->{'session'}->{'o_sess_vers'};
 }
 
 sub session_origin_net_type {
 	my $self=shift;
 	my ($net_type) = @_;
-    $self->{'o_net_type'} = $net_type if defined $net_type;
+    $self->{'session'}->{'o_net_type'} = $net_type if defined $net_type;
 	return $self->{'session'}->{'o_net_type'};
 }
 
 sub session_origin_addr_type {
 	my $self=shift;
 	my ($addr_type) = @_;
-    $self->{'o_addr_type'} = $addr_type if defined $addr_type;
+    $self->{'session'}->{'o_addr_type'} = $addr_type if defined $addr_type;
 	return $self->{'session'}->{'o_addr_type'};
 }
 
 sub session_origin_address {
 	my $self=shift;
 	my ($addr) = @_;
-    $self->{'o_address'} = $addr if defined $addr;
+    $self->{'session'}->{'o_address'} = $addr if defined $addr;
 	return $self->{'session'}->{'o_address'};
 }
 
@@ -675,7 +690,7 @@ sub time_desc_arrayref {
 sub new_time_desc {
 	my $self = shift;
 	
-	my $time = Net::SDP::Time->_new( $self );
+	my $time = new Net::SDP::Time();
 	push( @{$self->{'time'}}, $time );
 
 	return $time;
@@ -687,7 +702,7 @@ sub new_media_desc {
 	my $self = shift;
 	my ($media_type) = @_;
 	
-	my $media = Net::SDP::Media->_new( $self );
+	my $media = new Net::SDP::Media();
 	$media->media_type( $media_type ) if (defined $media_type);
 	push( @{$self->{'media'}}, $media );
 
@@ -743,17 +758,21 @@ for each Time Description (t=) and Media Description (m=).
 
 =over 4
 
-=item B<new()>
+=item B<new( [source] )>
 
 Creates a new C<Net::SDP> session description object with default values for 
 the required fields.
 
+If the optional paramater C<source> is specified, then it is passed to 
+parse().
 
-=item B<parse( [source] )>
+
+=item B<parse( source )>
 
 Parses in an SDP description. This method tries to work our the source of the SDP data
 automatically and is ideal for use with command line tools. The source may be 
-a path to a file, a URL, SDP data itself or if undefined will be read in on STDIN.
+a path to a file, a URL, a C<Net::SAP::Packet> object, SDP data itself or if undefined
+ will be read in on STDIN.
 Returns 1 if successful, or 0 on failure.
 
 
@@ -874,16 +893,6 @@ Example:
 
 	$name = $sdp->session_name();
 	$sdp->session_name( 'My Cool Session' );
-
-
-=item B<session_info()>
-
-Get or Set the session information/description field. B<[i=]>
-
-Example:
-
-	$name = $sdp->session_info();
-	$sdp->session_info( 'Broadcast live from Southampton' );
 
 
 =item B<session_info()>
@@ -1044,9 +1053,16 @@ Example:
 
 =head1 SEE ALSO
 
-perl(1), Net::SAP(3)
+perl(1), L<Net::SAP>
 
-http://www.ietf.org/rfc/rfc2327.txt
+L<http://www.ietf.org/rfc/rfc2327.txt>
+
+=head1 BUGS
+
+Please report any bugs or feature requests to
+C<bug-net-sdp@rt.cpan.org>, or through the web interface at
+L<http://rt.cpan.org>.  I will be notified, and then you'll automatically
+be notified of progress on your bug as I make changes.
 
 =head1 AUTHOR
 

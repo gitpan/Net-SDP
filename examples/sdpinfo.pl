@@ -41,6 +41,7 @@ foreach my $media ( @$media_list ) {
  
  	print "\n";
 	print "Media Type: ".$media->media_type()."\n";
+	print "Media Title: ".$media->title()."\n";
 	print "Media Transport: ".$media->transport()."\n";
 	print "Network Address: ".$media->address()."\n";
 	print "Network Port: ".$media->port()."\n";
@@ -48,6 +49,4 @@ foreach my $media ( @$media_list ) {
 	print "Default Payload ID: ".$media->default_format_num()."\n";
 	print "Default Format: ".$media->default_format()."\n";
 }
-
-
 

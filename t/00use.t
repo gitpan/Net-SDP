@@ -13,7 +13,7 @@ use Net::SDP;
 # Helpful notes.  All note-lines must start with a "#".
 print "# I'm testing Net::SDP version $Net::SDP::VERSION\n";
 
-# Module has loaded sucessfully 
+# Test 1: Module has loaded sucessfully 
 ok(1);
 
 

@@ -15,17 +15,15 @@ use vars qw/$VERSION/;
 use constant NTPOFFSET => 2208988800;
 use Carp;
 
-$VERSION="0.01";
+$VERSION="0.02";
 
 
 
-sub _new {
+sub new {
 	my $class = shift;
-	my $session = shift;
 	my $self = {
 		't_start' => '0',
 		't_end' => '0',
-		'session' => $session,
 	};
 	bless $self, $class;	
 
