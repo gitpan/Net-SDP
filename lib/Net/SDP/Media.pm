@@ -13,7 +13,7 @@ package Net::SDP::Media;
 use strict;
 use vars qw/$VERSION %static_pt_map/;
 use Carp;
-$VERSION="0.02";
+$VERSION="0.03";
 
 
 
@@ -141,6 +141,10 @@ sub _parse_c {
 		carp "Address type is not IP4 or IP6: ".$self->{'c_addr_type'};
 	}
 	
+	if (!defined $self->{'c_ttl'}) {
+		$self->{'c_ttl'} = 0;
+	}
+	
 	if (defined $range and $range ne '' and $range ne '1') {
 		carp "Address ranges are not supported by Net::SDP.";
 	}
@@ -151,11 +155,15 @@ sub _parse_c {
 
 sub _generate_c {
 	my $self = shift;
-
-	return	'c='.$self->{'c_net_type'}.' '.
+	my $c = 'c='.$self->{'c_net_type'}.' '.
 			$self->{'c_addr_type'}.' '.
-			$self->{'c_address'}.'/'.
-			$self->{'c_ttl'}."\n";
+			$self->{'c_address'};
+			
+	if ($self->{'c_ttl'}) {
+		$c .= '/'.$self->{'c_ttl'};
+	}
+
+	return "$c\n";
 }
 
 
@@ -433,6 +441,7 @@ Example:
 =item B<ttl()>
 
 Get or Set the Time to Live for packets in this media description. B<[c=]>
+To not specify a TTL, then set to 0.
 
 Example:
 
@@ -513,16 +522,6 @@ Example:
 
 Removes the specified format number from the list of payload IDs/formats 
 that are allowed for this media description. B<[m=]>
-
-Example:
-
-	$audio->remove_format_num( 0 );
-
-
-=item B<default_format_num( num )>
-
-Changes the default format number/payload ID in the list of formats.
-The format number doesn't need to already be in the list of formats. B<[m=]>
 
 Example:
 
