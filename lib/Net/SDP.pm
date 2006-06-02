@@ -22,7 +22,7 @@ use Sys::Hostname;
 use Net::hostent;
 use Carp;
 
-$VERSION="0.03";
+$VERSION="0.04";
 
 
 
@@ -36,7 +36,7 @@ sub new {
     				'o_sess_id' => Net::SDP::Time::_ntptime(),
     				'o_sess_vers' => Net::SDP::Time::_ntptime(),
     				'o_net_type' => 'IN',
-    				'o_addr_type' => 'IN4',
+    				'o_addr_type' => 'IP4',
     				'o_address' => gethost(hostname())->name(),
     				'p' => [],
     				'e' => [],
@@ -183,20 +183,24 @@ sub parse_data {
 
 			} elsif ($field eq 'r') {
 				
-				## Add to last time descriptor			
-				# XXXXXX Check array exists XXXXXX
-				#$self->{'time'}->[-1]->{$field} = $value;
+				# Add to last time descriptor
+				unless ( $self->{'time'}->[-1] ) {
+				  carp "No previous 't' parameter to associate 'r' with: $line\n";
+				  next;
+				}
 
-			} elsif ($field =~ /o/) {
+				$self->{'time'}->[-1]->_parse_r($value);
+
+			} elsif ($field eq 'o') {
 
 				$self->_parse_o( $value );
 
-			} elsif ($field =~ /p|e/) {
+			} elsif ($field eq 'p' || $field eq 'e') {
 				
 				# Phone and email can have more than one value
 				push( @{$self->{'session'}->{$field}}, $value );
 
-			} elsif ($field =~ /a|b/) {
+			} elsif ($field eq 'a' || $field eq 'b') {
 			
 				# More than one value is allowed
 				_add_attribute( $self->{'session'}, $field, $value );
@@ -312,6 +316,7 @@ sub generate {
 	foreach my $time ( @{$self->{'time'}} ) {
 		$sdp .= $time->_generate_t();
 		#$sdp .= _generate_lines($time, 'z', 1 );
+		$sdp .= $time->_generate_r();
 	}
 
 	$sdp .= _generate_lines($session, 'k', 1 );
@@ -544,8 +549,18 @@ sub session_email {
 	}
 
     # Multiple emails are allowed, but we just return the first
-    if (defined $session->{'e'}) {
+    if (exists $session->{'e'}->[0]) {
     	return $session->{'e'}->[0];
+    }
+    return undef;
+}
+
+sub session_email_arrayref {
+    my $self=shift;
+    my $session = $self->{'session'};
+    
+    if (defined $session->{'e'}) {
+        return $session->{'e'};
     }
     return undef;
 }
@@ -565,8 +580,18 @@ sub session_phone {
 	}
 
     # Multiple phone numbers are allowed, but we just return the first
-    if (defined $session->{'p'}) {
+    if (exists $session->{'p'}->[0]) {
     	return $session->{'p'}->[0];
+    }
+    return undef;
+}
+
+sub session_phone_arrayref {
+    my $self=shift;
+    my $session = $self->{'session'};
+    
+    if (defined $session->{'p'}) {
+        return $session->{'p'};
     }
     return undef;
 }
@@ -640,6 +665,16 @@ sub session_add_attribute {
 	Net::SDP::_add_attribute( $self->{'session'}, 'a', $attrib );
 }
 
+# Delete a session atrribute
+sub session_del_attribute {
+	my $self = shift;
+	my ($name) = @_;
+	carp "Missing attribute name" unless (defined $name);
+
+	if ( exists $self->{'session'}->{'a'}->{$name} ) {
+		delete $self->{'session'}->{'a'}->{$name};
+	}
+}
 
 
 
@@ -666,12 +701,44 @@ sub media_desc_arrayref {
 	return $self->{'media'};
 }
 
-# Return first time description
-sub time_desc {
+# delete all Net::SDP::Media elements
+sub media_desc_delete_all {
 	my ($self) = @_;
 
+	$self->{'media'} = [ ];
+	
+	return 0;
+}
+
+# delete a specific ARRAYREF Net::SDP::Media element
+sub media_desc_delete {
+	my $self = shift;
+             my ($num) = @_;
+	
+	return 1 if ( !defined($num) || !defined($self->{'media'}->[$num]) );
+
+	my $results = [ ];
+	for my $loop ( 0...(scalar(@{$self->{'media'}}) - 1) ) {
+		next if ( $loop == $num );
+		
+		push @$results, $self->{'media'}->[$loop];
+	}
+	$self->{'media'} = $results;
+
+	return 0;
+}
+
+# Return $num time description, for backwards compatibility the
+# first time description by default if nothing is passed to it
+sub time_desc {
+	my $self = shift;
+	my ($num) = @_;
+	
+	$num = 0 unless ( defined $num );
+	return undef unless ( defined($self->{'time'}->[$num]) );
+
 	## Ensure that one exists ?
-	return $self->{'time'}->[0];
+	return $self->{'time'}->[$num];
 }
 
 # Return all time descriptions
@@ -681,9 +748,33 @@ sub time_desc_arrayref {
 	return $self->{'time'};
 }
 
+# delete all Net::SDP::Time elements
+sub time_desc_delete_all {
+	my ($self) = @_;
 
+	$self->{'time'} = [ ];
+	
+	return 0;
+}
 
+# delete a specific ARRAYREF Net::SDP::Time element
+sub time_desc_delete {
+	my $self = shift;
+	my ($num) = @_;
+	
+	return 1 unless ( defined $num );
+	return 1 unless ( defined $self->{'time'}->[$num] );
 
+	my $results = [ ];
+	for my $loop ( 0...(scalar(@{$self->{'time'}}) - 1) ) {
+		next if ( $loop == $num );
+		
+		push @$results, $self->{'time'}->[$loop];
+	}
+	$self->{'time'} = $results;
+
+	return 0;
+}
 
 
 # Net::SDP::Time factory method
@@ -810,7 +901,7 @@ Get or Set the whole of the session origin field. B<[o=]>
 Example:
 
 	$origin = $sdp->session_origin();
-	$sdp->session_origin( 'njh 3303643609 3303643669 IN IN4 152.78.104.83' );
+	$sdp->session_origin( 'njh 3303643609 3303643669 IN IP4 152.78.104.83' );
   
 
 =item B<session_origin_username()>
@@ -928,6 +1019,11 @@ Example:
 	$sdp->session_email( 'njh@ecs.soton.ac.uk' );
 	$sdp->session_email( ['njh@ecs.soton.ac.uk', 'njh@surgeradio.co.uk'] );
 
+=item B<session_email_arrayref()>
+
+Returns all email addresses as an array reference. Will return an
+empty ARRAYREF if no email addresses are available.
+
 
 =item B<session_phone()>
 
@@ -941,6 +1037,12 @@ Example:
 	$phone = $sdp->session_phone();
 	$sdp->session_phone( '+44 870 357 2287' );
 	$sdp->session_phone( ['0870 357 2287', '41287'] );
+
+
+=item B<session_phone_arrayref()>
+
+Returns all phone numbers as an array reference. Will return an
+empty ARRAYREF if no phone numbers are available.
 
 
 =item B<session_key( method, [key] )>
@@ -993,6 +1095,14 @@ Example:
 
 	$audio->session_add_attribute( 'lang', 'en');
 	$audio->session_add_attribute( 'lang', 'fr');
+	
+	
+=item B<session_del_attribute( name )>
+
+Deletes all attributes of given name.
+Example:
+
+	$audio->session_del_attribute( 'lang' );
 
 
 =item B<media_desc_of_type( type )>
@@ -1009,15 +1119,39 @@ Example:
 Returns an ARRAYREF of all the media descriptions - C<Net::SDP::Media> objects.
 
 
+=item B<media_desc_delete_all()>
 
-=item B<time_desc()>
+Deletes all media descriptors.
 
-Returns the first time description (as a C<Net::SDP::Time>).
+
+=item B<media_desc_delete( $num )>
+
+Delete media description with index C<$num>.
+Returns 0 if successful or 1 on failure.
+
+
+=item B<time_desc( [$num] )>
+
+Returns the time description with index number $num. 
+Returns the first time description if, $num is undefined.
+Return undef if no time description of chosen index is available.
+Returns a C<Net::SDP::Time>.
 
 
 =item B<time_desc_arrayref()>
 
 Returns an ARRAYREF of all the time descriptions - C<Net::SDP::Time> objects.
+
+
+=item B<time_desc_delete_all()>
+
+Deletes all time descriptors.
+
+
+=item B<time_desc_delete( $num )>
+
+Delete time description with index C<$num>.
+Returns 0 if successful or 1 on failure.
 
 
 =item B<new_time_desc()>
@@ -1040,6 +1174,8 @@ Example:
 =head1 TODO
 
 =over
+
+=item Stricter parsing of SDP, so that it can be used as a validator
 
 =item Deal with multiple email / phone numbers better (e=) (p=)
 
