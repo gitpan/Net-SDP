@@ -22,7 +22,7 @@ use Sys::Hostname;
 use Net::hostent;
 use Carp;
 
-$VERSION="0.05";
+$VERSION="0.07";
 
 
 
@@ -50,8 +50,11 @@ sub new {
    	
    	# Parse data if we are passed some
    	if (defined $data) {
-   		$self->parse( $data );
-   	} else {
+		unless ($self->parse( $data )) {
+			# Failed to parse
+			return undef;
+		}
+    } else {
    		# Use sane defaults
    		$self->{'session'}->{'o_uname'} = $ENV{'USER'} || '-';
    		$self->{'session'}->{'o_sess_id'} = Net::SDP::Time::_ntptime();
@@ -80,7 +83,8 @@ sub parse {
 		if (ref $source eq 'Net::SAP::Packet') {
 			# It is a SAP packet
 			if ($source->payload_type() ne 'application/sdp') {
-				croak "Payload type of Net::SAP::Packet is not application/sdp.";
+				carp "Payload type of Net::SAP::Packet is not application/sdp.";
+				return 0;
 			}
 			return $self->parse_data( $source->payload() );
 
@@ -92,16 +96,22 @@ sub parse {
     		# Looks like a URL
     		return $self->parse_url( $source );
     		
+    	} elsif ($source eq '-') {
+    		# Parse STDIN
+			return $self->parse_stdin();
+    		
     	} elsif ($source ne '') {
     		# Assume it is a filename
      		return $self->parse_file( $source );
-    		
+
     	} else {
-			return $self->parse_stdin();
+    		carp "Failed to parse empty string.";
+    		return 0;
     	}
     
 	} elsif (@_ == 0) {
 		return $self->parse_stdin();
+		
 	} else {
 		croak "Too many parameters for parse()";
 	}
@@ -869,7 +879,7 @@ Creates a new C<Net::SDP> session description object with default values for
 the required fields.
 
 If the optional paramater C<source> is specified, then it is passed to 
-parse().
+parse(). If parsing fails, than new() will return undef.
 
 
 =item B<parse( source )>
@@ -881,9 +891,9 @@ a path to a file, a URL, a C<Net::SAP::Packet> object, SDP data itself or if und
 Returns 1 if successful, or 0 on failure.
 
 
-B<NOTE:> it is faster to pass SDP data striaught into the new() method, as it does not 
-then initiallise the object with default values (which involves doing DNS lookups to
-find out the name of the local host).
+B<NOTE:> it is faster to pass SDP data straight into the new() method, as it does not 
+then initialise the object with default values, this involves doing DNS lookups to
+find out the name of the local host.
 
 
 =item B<parse_file( filepath )>
@@ -1196,13 +1206,7 @@ Example:
 
 =item Stricter parsing of SDP, so that it can be used as a validator
 
-=item Deal with multiple email / phone numbers better (e=) (p=)
-
 =item Add support for Zone Adjustments (z=)
-
-=item Net::SDP::Time doesn't handle (r=) Repeat Time Field
-
-=item Deleting and adjusting stuff like attributes
 
 =back
 
